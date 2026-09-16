@@ -15,10 +15,13 @@ spec:
     feastoperator:
       managementState: Managed
 
+    aigateway:
+      managementState: Managed
+      modelsAsAService:
+        managementState: Managed
+
     kserve:
       managementState: Managed
-      modelsAsService:
-        managementState: Removed
       nim:
         airGapped: false
         managementState: Managed

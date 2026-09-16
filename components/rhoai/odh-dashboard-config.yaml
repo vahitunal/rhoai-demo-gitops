@@ -1,0 +1,29 @@
+apiVersion: opendatahub.io/v1alpha
+kind: OdhDashboardConfig
+metadata:
+  name: odh-dashboard-config
+  namespace: redhat-ods-applications
+  labels:
+    app.kubernetes.io/part-of: rhods-dashboard
+    app.opendatahub.io/rhods-dashboard: "true"
+spec:
+  dashboardConfig:
+    disableKServeMetrics: false
+    disableLMEval: false
+    disableModelCatalog: false
+    disableModelRegistry: false
+    disableTracking: false
+    genAiStudio: true
+    modelAsService: true
+    observabilityDashboard: false
+    externalModels: false
+
+  hardwareProfileOrder: []
+
+  notebookController:
+    enabled: true
+    notebookNamespace: rhods-notebooks
+    pvcSize: 20Gi
+
+  templateDisablement: []
+  templateOrder: []

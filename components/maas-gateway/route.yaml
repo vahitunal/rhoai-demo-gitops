@@ -1,0 +1,25 @@
+
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: maas-default-gateway
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-options: ServerSideApply=false
+    router.openshift.io/service-ca-certificate: "true"
+spec:
+  host: replace-me.example.com
+
+  to:
+    kind: Service
+    name: maas-default-gateway-openshift-default
+    weight: 100
+
+  port:
+    targetPort: https
+
+  tls:
+    termination: reencrypt
+    insecureEdgeTerminationPolicy: Redirect
+
+  wildcardPolicy: None
