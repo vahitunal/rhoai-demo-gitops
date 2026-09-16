@@ -17,6 +17,10 @@ spec:
     server: https://kubernetes.default.svc
     namespace: openshift-ingress
 
-  syncPolicy:
-    syncOptions:
-      - ServerSideApply=true
+  ignoreDifferences:
+    - group: route.openshift.io
+      kind: Route
+      name: openshift-ai-inference
+      namespace: openshift-ingress
+      jsonPointers:
+        - /spec/host
