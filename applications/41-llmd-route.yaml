@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rhoai-demo-llmd-route
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "41"
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/vahitunal/rhoai-demo-gitops.git
+    targetRevision: main
+    path: components/llmd-route
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-ingress
+
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
