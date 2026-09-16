@@ -1,0 +1,13 @@
+apiVersion: operator.authorino.kuadrant.io/v1beta1
+kind: Authorino
+metadata:
+  name: authorino
+  namespace: kuadrant-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  listener:
+    tls:
+      enabled: true
+      certSecretRef:
+        name: authorino-server-cert
