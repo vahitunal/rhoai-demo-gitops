@@ -1,0 +1,17 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-lws-operator
+  namespace: openshift-lws-operator
+spec:
+  targetNamespaces:
+    - openshift-lws-operator
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: openshift-jobset-operator
+  namespace: openshift-jobset-operator
+spec:
+  targetNamespaces:
+    - openshift-jobset-operator
