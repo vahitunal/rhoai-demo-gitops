@@ -6,3 +6,4 @@ resources:
   - operatorgroups.yaml
   - subscriptions.yaml
   - jobset-operator-instance.yaml
+  - kuadrant-console-plugin.yaml
