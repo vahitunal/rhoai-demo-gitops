@@ -15,3 +15,12 @@ metadata:
 spec:
   targetNamespaces:
     - openshift-jobset-operator
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: redhat-ods-operator
+  namespace: redhat-ods-operator
+spec:
+  targetNamespaces:
+    - redhat-ods-operator
