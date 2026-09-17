@@ -1,0 +1,10 @@
+apiVersion: operator.openshift.io/v1alpha1
+kind: JobSetOperator
+metadata:
+  name: cluster
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  logLevel: Normal
+  operatorLogLevel: Normal
+  managementState: Managed

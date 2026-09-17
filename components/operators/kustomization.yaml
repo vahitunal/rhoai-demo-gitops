@@ -5,3 +5,4 @@ resources:
   - namespaces.yaml
   - operatorgroups.yaml
   - subscriptions.yaml
+  - jobset-operator-instance.yaml
