@@ -18,7 +18,7 @@ spec:
     disableTracking: false
     genAiStudio: true
     modelAsService: true
-    observabilityDashboard: false
+    observabilityDashboard: true
     externalModels: false
 
   hardwareProfileOrder: []

@@ -8,8 +8,18 @@ spec:
   applicationsNamespace: redhat-ods-applications
   monitoring:
     managementState: Managed
-    metrics: {}
     namespace: redhat-ods-monitoring
+    metrics:
+      replicas: 1
+      storage:
+        size: 5Gi
+        retention: 7d
+    alerting: {}
+    traces:
+      sampleRatio: "0.1"
+      storage:
+        backend: pv
+        retention: 168h
   trustedCABundle:
     customCABundle: ""
     managementState: Managed
