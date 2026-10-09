@@ -1,0 +1,48 @@
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: qwen3-maas
+  namespace: maas-demo
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    opendatahub.io/hardware-profile-name: high-cpu
+    opendatahub.io/hardware-profile-namespace: redhat-ods-applications
+    opendatahub.io/model-type: generative
+    openshift.io/display-name: qwen3-maas
+  labels:
+    opendatahub.io/dashboard: "true"
+    opendatahub.io/genai-asset: "true"
+spec:
+  model:
+    name: qwen3-maas
+    uri: hf://Qwen/Qwen3-1.7B
+  replicas: 1
+  router:
+    gateway:
+      refs:
+        - name: maas-default-gateway
+          namespace: openshift-ingress
+    route: {}
+    scheduler: {}
+  template:
+    containers:
+      - name: main
+        image: registry.redhat.io/rhaii/vllm-cpu-rhel9@sha256:578e9946e60a14596185937f6a083c1d42f3cff343b18648090b9ac80691d2e0
+        env:
+          - name: VLLM_CPU_KVCACHE_SPACE
+            value: "4"
+          - name: HF_HUB_OFFLINE
+            value: "0"
+          - name: LD_PRELOAD
+            value: /usr/lib64/libomp.so
+          - name: VLLM_ADDITIONAL_ARGS
+            value: >-
+              --dtype float32 --max-model-len 4096
+              --enable-auto-tool-choice --tool-call-parser hermes
+        resources:
+          requests:
+            cpu: "4"
+            memory: 16Gi
+          limits:
+            cpu: "8"
+            memory: 32Gi

@@ -5,3 +5,4 @@ resources:
   - dsci.yaml
   - dsc.yaml
   - odh-dashboard-config.yaml
+  - hardwareprofile-high-cpu.yaml
