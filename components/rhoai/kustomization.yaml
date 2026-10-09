@@ -6,3 +6,4 @@ resources:
   - dsc.yaml
   - odh-dashboard-config.yaml
   - hardwareprofile-high-cpu.yaml
+  - rhods-admins-group.yam

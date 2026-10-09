@@ -1,0 +1,19 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSSubscription
+metadata:
+  name: maas-demo-subs
+  namespace: models-as-a-service
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+    openshift.io/display-name: maas-demo-subs
+spec:
+  modelRefs:
+    - name: qwen3-maas
+      namespace: maas-demo
+      tokenRateLimits:
+        - limit: 2000
+          window: 5m
+  owner:
+    groups:
+      - name: rhods-admins
+  priority: 0

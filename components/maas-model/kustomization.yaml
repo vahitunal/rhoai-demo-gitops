@@ -4,3 +4,5 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - llminferenceservice.yaml
+  - subscription.yaml
+  - auth-policy.yaml
