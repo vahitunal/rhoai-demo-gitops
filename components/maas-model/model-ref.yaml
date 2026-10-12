@@ -1,0 +1,12 @@
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: MaaSModelRef
+metadata:
+  name: qwen3-maas
+  namespace: maas-demo
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+    openshift.io/display-name: qwen3-maas
+spec:
+  modelRef:
+    kind: LLMInferenceService
+    name: qwen3-maas
