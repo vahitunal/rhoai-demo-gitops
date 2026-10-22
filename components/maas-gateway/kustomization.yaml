@@ -11,7 +11,7 @@ configMapGenerator:
   - name: maas-cluster-settings
     namespace: openshift-ingress
     literals:
-      - hostname=maas.apps.cluster-679n9.dyn.redhatworkshops.io
+      - hostname=maas.apps.cluster-2g88s.dyn.redhatworkshops.io
 
 generatorOptions:
   disableNameSuffixHash: true
