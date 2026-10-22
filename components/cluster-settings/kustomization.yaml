@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+configMapGenerator:
+  - name: maas-cluster-settings
+    literals:
+      - hostname=maas.apps.cluster-2g88s.dyn.redhatworkshops.io
+      - base-url=https://maas.invalid/v1
+
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    ogx.io/watch: "true"
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: maas-cluster-settings
+      fieldPath: data.hostname
+    targets:
+      - select:
+          kind: ConfigMap
+          name: maas-cluster-settings
+        fieldPaths:
+          - data.base-url
+        options:
+          delimiter: /
+          index: 2

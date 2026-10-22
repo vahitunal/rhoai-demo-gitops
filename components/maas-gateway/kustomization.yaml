@@ -2,19 +2,20 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
+  - ../cluster-settings
   - gatewayclass.yaml
   - gateway-options.yaml
   - gateway.yaml
   - route.yaml
 
-configMapGenerator:
-  - name: maas-cluster-settings
-    namespace: openshift-ingress
-    literals:
-      - hostname=maas.apps.cluster-2g88s.dyn.redhatworkshops.io
-
-generatorOptions:
-  disableNameSuffixHash: true
+patches:
+  - target:
+      kind: ConfigMap
+      name: maas-cluster-settings
+    patch: |-
+      - op: add
+        path: /metadata/namespace
+        value: openshift-ingress
 
 replacements:
   - source:
@@ -27,7 +28,6 @@ replacements:
           name: maas-default-gateway
         fieldPaths:
           - spec.listeners.0.hostname
-
       - select:
           kind: Route
           name: maas-default-gateway

@@ -17,7 +17,7 @@ data:
         - provider_id: maas-vllm-inference-1
           provider_type: remote::vllm
           config:
-            base_url: https://maas.apps.cluster-2g88s.dyn.redhatworkshops.io/v1
+            base_url: ${env.OGX_DEMO_MAAS_BASE_URL}
             api_token: ${env.OGX_DEMO_MAAS_TOKEN}
             max_tokens: 256
             tls_verify: true
@@ -62,6 +62,11 @@ spec:
         - -c
         - ogx run /etc/ogx/config.yaml --insecure
       env:
+        - name: OGX_DEMO_MAAS_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: maas-cluster-settings
+              key: base-url
         - name: OGX_CONFIG_DIR
           value: /.ogx
         - name: OGX_DEMO_MAAS_TOKEN
