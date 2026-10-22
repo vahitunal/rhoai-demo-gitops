@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ogx-agent-demo-config
+  namespace: maas-demo
+  labels:
+    ogx.io/watch: "true"
+data:
+  config.yaml: |
+    version: "2"
+    distro_name: rh
+    apis:
+      - inference
+
+    providers:
+      inference:
+        - provider_id: maas-vllm-inference-1
+          provider_type: remote::vllm
+          config:
+            base_url: https://maas.apps.cluster-2g88s.dyn.redhatworkshops.io/v1
+            api_token: ${env.OGX_DEMO_MAAS_TOKEN}
+            max_tokens: 256
+            tls_verify: true
+
+    registered_resources:
+      models:
+        - model_id: publishers/maas-demo/models/qwen3-maas
+          provider_id: maas-vllm-inference-1
+          model_type: llm
+
+    server:
+      port: 8321
+---
+apiVersion: ogx.io/v1beta1
+kind: OGXServer
+metadata:
+  name: ogx-agent-demo
+  namespace: maas-demo
+spec:
+  distribution:
+    name: rh
+
+  network:
+    port: 8321
+
+  overrideConfig:
+    name: ogx-agent-demo-config
+    key: config.yaml
+
+  workload:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 500Mi
+      limits:
+        cpu: "2"
+        memory: 2Gi
+    overrides:
+      command:
+        - /bin/sh
+        - -c
+        - ogx run /etc/ogx/config.yaml --insecure
+      env:
+        - name: OGX_CONFIG_DIR
+          value: /.ogx
+        - name: OGX_DEMO_MAAS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ogx-maas-token
+              key: token
