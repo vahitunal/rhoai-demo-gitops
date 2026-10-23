@@ -62,7 +62,28 @@ def list_pods(namespace: Literal["maas-demo"]) -> dict:
             ],
         })
 
-    return {"namespace": namespace, "pods": pods}
+    running = [p for p in pods if p["phase"] == "Running"]
+    summary = {
+        "total_pods": len(pods),
+        "running_pods": len(running),
+        "running_ready_pods": sum(
+            p["ready"].split("/")[0] == p["ready"].split("/")[1]
+            for p in running
+        ),
+        "succeeded_pods": sum(p["phase"] == "Succeeded" for p in pods),
+        "pending_pods": sum(p["phase"] == "Pending" for p in pods),
+        "failed_pods": sum(p["phase"] == "Failed" for p in pods),
+        "other_phase_pods": sum(
+            p["phase"] not in {"Running", "Succeeded", "Pending", "Failed"}
+            for p in pods
+        ),
+        "pods_with_waiting_containers": sum(
+            bool(p["waiting_reasons"]) for p in pods
+        ),
+        "pods_with_restarts": sum(p["restarts"] > 0 for p in pods),
+        "total_restarts": sum(p["restarts"] for p in pods),
+    }
+    return {"namespace": namespace, "summary": summary, "pods": pods}
 
 
 if __name__ == "__main__":
