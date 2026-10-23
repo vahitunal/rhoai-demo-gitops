@@ -68,15 +68,31 @@ async def agent(prompt):
                 http_client=DefaultHttpxClient(trust_env=False),
                 http_async_client=DefaultAsyncHttpxClient(trust_env=False),
             )
-            model_with_tools = client.bind_tools(tools)
+            model_with_tools = client.bind_tools(
+                tools,
+                tool_choice={
+                    "type": "function",
+                    "function": {"name": "list_pods"},
+                },
+            )
+            summary_model = client.bind_tools(tools, tool_choice="none")
             trace = []
 
             async def model_node(state):
                 if state["model_calls"] >= 3:
                     raise RuntimeError("3 model çağrısı sınırına ulaşıldı.")
-                response = await model_with_tools.ainvoke(
+                caller = (
+                    model_with_tools
+                    if state["model_calls"] == 0
+                    else summary_model
+                )
+                response = await caller.ainvoke(
                     [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
                 )
+                if state["model_calls"] == 0 and not response.tool_calls:
+                    raise RuntimeError(
+                        "Model zorunlu araç çağrısını üretmedi; yanıt verilmedi."
+                    )
                 return {
                     "messages": [response],
                     "model_calls": state["model_calls"] + 1,
