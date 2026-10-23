@@ -14,6 +14,14 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: maas-demo
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: mcp-pods
+      namespace: maas-demo
+      jqPathExpressions:
+        - '.spec.template.spec.containers[] | select(.name == "mcp") | .image'
   syncPolicy:
     syncOptions:
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true

@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mcp-pods
+  namespace: maas-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mcp-pods
+  namespace: maas-demo
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mcp-pods
+  namespace: maas-demo
+subjects:
+  - kind: ServiceAccount
+    name: mcp-pods
+    namespace: maas-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mcp-pods
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-pods
+  namespace: maas-demo
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"mcp-pods:latest","namespace":"maas-demo"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mcp\")].image","paused":false}]
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-pods
+  template:
+    metadata:
+      labels:
+        app: mcp-pods
+    spec:
+      serviceAccountName: mcp-pods
+      automountServiceAccountToken: true
+      containers:
+        - name: mcp
+          image: image-registry.openshift-image-registry.svc:5000/maas-demo/mcp-pods:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-u", "/opt/app-root/src/app.py"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 20
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-pods
+  namespace: maas-demo
+spec:
+  selector:
+    app: mcp-pods
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
