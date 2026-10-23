@@ -1,0 +1,33 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: mcp-pods
+  namespace: maas-demo
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: mcp-pods
+  namespace: maas-demo
+spec:
+  runPolicy: Serial
+  source:
+    type: Git
+    git:
+      uri: https://github.com/vahitunal/rhoai-demo-gitops.git
+      ref: main
+    contextDir: src/mcp-pods
+  strategy:
+    type: Source
+    sourceStrategy:
+      from:
+        kind: DockerImage
+        name: registry.access.redhat.com/ubi9/python-312:latest
+  output:
+    to:
+      kind: ImageStreamTag
+      name: mcp-pods:latest
+  triggers:
+    - type: ConfigChange
+  successfulBuildsHistoryLimit: 2
+  failedBuildsHistoryLimit: 2
