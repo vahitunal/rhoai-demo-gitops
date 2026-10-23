@@ -35,7 +35,8 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7fa;padding:14px}
 <button id="send">Gönder</button><span id="status" role="status"></span>
 </form>
 <section id="result" hidden>
-<h2>Model yanıtı</h2><div id="answer"></div>
+<h2>MCP pod özeti</h2><pre id="summary"></pre>
+<h2>Model yorumu</h2><div id="answer"></div>
 <p id="usage"></p>
 <details><summary>MCP araç çağrıları ve sonuçları</summary><pre id="trace"></pre></details>
 </section>
@@ -57,6 +58,21 @@ form.addEventListener('submit',async event=>{
     const data=await response.json();
     if(!response.ok)throw Error(data.error||'İstek başarısız.');
     document.getElementById('answer').textContent=data.answer||'Model görünür bir yanıt üretmedi.';
+    const fields=[
+      ['total_pods','Toplam pod'],
+      ['running_pods','Çalışan pod'],
+      ['running_ready_pods','Çalışan ve tüm containerları hazır pod'],
+      ['succeeded_pods','Tamamlanan pod'],
+      ['pending_pods','Pending pod'],
+      ['failed_pods','Failed pod'],
+      ['other_phase_pods','Diğer phase'],
+      ['pods_with_waiting_containers','Bekleyen container içeren pod'],
+      ['pods_with_restarts','Geçmiş restart kaydı olan pod'],
+      ['total_restarts','Toplam geçmiş restart']
+    ];
+    document.getElementById('summary').textContent=data.pod_summary
+      ? fields.map(([key,label])=>label+': '+data.pod_summary[key]).join('\n')
+      : 'MCP özeti alınamadı.';
     document.getElementById('trace').textContent=JSON.stringify(data.tool_calls,null,2);
     document.getElementById('usage').textContent=
       'Model çağrısı: '+data.model_calls+' · Toplam token: '+data.total_tokens+
