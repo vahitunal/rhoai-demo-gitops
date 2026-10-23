@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: langgraph-mcp
+  namespace: maas-demo
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langgraph-mcp
+  namespace: maas-demo
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"langgraph-mcp:latest","namespace":"maas-demo"},"fieldPath":"spec.template.spec.containers[?(@.name==\"agent\")].image","paused":false}]
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langgraph-mcp
+  template:
+    metadata:
+      labels:
+        app: langgraph-mcp
+    spec:
+      serviceAccountName: langgraph-mcp
+      automountServiceAccountToken: false
+      containers:
+        - name: agent
+          image: image-registry.openshift-image-registry.svc:5000/maas-demo/langgraph-mcp:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python3", "-u", "/opt/app-root/src/web.py"]
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: OGX_BASE_URL
+              value: http://ogx-agent-demo-service.maas-demo.svc.cluster.local:8321/v1
+            - name: OGX_MODEL
+              value: maas-vllm-inference-1/publishers/maas-demo/models/qwen3-maas
+            - name: MCP_URL
+              value: http://mcp-pods.maas-demo.svc.cluster.local:8080/mcp
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langgraph-mcp
+  namespace: maas-demo
+spec:
+  selector:
+    app: langgraph-mcp
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: langgraph-mcp
+  namespace: maas-demo
+  annotations:
+    haproxy.router.openshift.io/timeout: 600s
+spec:
+  to:
+    kind: Service
+    name: langgraph-mcp
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

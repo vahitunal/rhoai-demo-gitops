@@ -14,6 +14,14 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: maas-demo
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: langgraph-mcp
+      namespace: maas-demo
+      jqPathExpressions:
+        - '.spec.template.spec.containers[] | select(.name == "agent") | .image'
   syncPolicy:
     syncOptions:
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true
