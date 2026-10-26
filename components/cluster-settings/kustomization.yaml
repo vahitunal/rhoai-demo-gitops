@@ -4,7 +4,7 @@ kind: Kustomization
 configMapGenerator:
   - name: maas-cluster-settings
     literals:
-      - hostname=maas.apps.cluster-2g88s.dyn.redhatworkshops.io
+      - hostname=maas.apps.cluster-h6rbw.dyn.redhatworkshops.io
       - base-url=https://maas.invalid/v1
 
 generatorOptions:
