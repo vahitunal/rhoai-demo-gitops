@@ -34,6 +34,17 @@ SYSTEM_PROMPT = (
 )
 
 
+import mlflow
+import mlflow.langchain
+
+mlflow.set_experiment(os.environ["MLFLOW_EXPERIMENT_NAME"])
+mlflow.langchain.autolog(
+    log_traces=True,
+    run_tracer_inline=True,
+)
+
+
+@mlflow.trace(name="agent_request", span_type="AGENT")
 async def agent(prompt):
     mcp_url = os.environ["MCP_URL"]
     base_url = os.environ["OGX_BASE_URL"].rstrip("/")
@@ -110,9 +121,19 @@ async def agent(prompt):
                     ):
                         raise RuntimeError("Kapsam dışı araç isteği reddedildi.")
 
-                    result = await session.call_tool(
-                        call["name"], arguments=call["args"]
-                    )
+                    with mlflow.start_span(
+                        name="mcp.list_pods", span_type="TOOL"
+                    ) as span:
+                        span.set_inputs({
+                            "name": call["name"],
+                            "arguments": call["args"],
+                        })
+                        result = await session.call_tool(
+                            call["name"], arguments=call["args"]
+                        )
+                        span.set_outputs(result.model_dump(mode="json"))
+                        if result.isError:
+                            span.set_status("ERROR")
                     content = "\n".join(
                         block.text
                         for block in result.content
