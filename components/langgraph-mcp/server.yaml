@@ -34,6 +34,16 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            - name: MLFLOW_TRACKING_URI
+              value: https://mlflow.redhat-ods-applications.svc:8443/mlflow
+            - name: MLFLOW_TRACKING_AUTH
+              value: kubernetes-namespaced
+            - name: MLFLOW_WORKSPACE
+              value: maas-demo
+            - name: MLFLOW_EXPERIMENT_NAME
+              value: langgraph-mcp-demo
+            - name: MLFLOW_TRACKING_SERVER_CERT_PATH
+              value: /var/run/mlflow-ca/service-ca.crt
             - name: OGX_BASE_URL
               value: http://ogx-agent-demo-service.maas-demo.svc.cluster.local:8321/v1
             - name: OGX_MODEL
@@ -58,6 +68,12 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           volumeMounts:
+            - name: mlflow-identity
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            - name: mlflow-service-ca
+              mountPath: /var/run/mlflow-ca
+              readOnly: true
             - name: tmp
               mountPath: /tmp
           startupProbe:
@@ -77,6 +93,26 @@ spec:
               port: http
             periodSeconds: 20
       volumes:
+        - name: mlflow-identity
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        fieldPath: metadata.namespace
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+        - name: mlflow-service-ca
+          configMap:
+            name: langgraph-mcp-service-ca
         - name: tmp
           emptyDir:
             sizeLimit: 64Mi
@@ -110,3 +146,26 @@ spec:
   tls:
     termination: edge
     insecureEdgeTerminationPolicy: Redirect
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: langgraph-mcp-mlflow
+  namespace: maas-demo
+subjects:
+  - kind: ServiceAccount
+    name: langgraph-mcp
+    namespace: maas-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mlflow-operator-mlflow-integration
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: langgraph-mcp-service-ca
+  namespace: maas-demo
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
