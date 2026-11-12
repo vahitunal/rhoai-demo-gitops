@@ -1,0 +1,25 @@
+{
+  "apiVersion": "argoproj.io/v1alpha1",
+  "kind": "Application",
+  "metadata": {
+    "name": "rag-embedding",
+    "namespace": "openshift-gitops"
+  },
+  "spec": {
+    "project": "default",
+    "source": {
+      "path": "components/rag-embedding",
+      "repoURL": "https://github.com/vahitunal/rhoai-demo-gitops.git",
+      "targetRevision": "main"
+    },
+    "destination": {
+      "namespace": "maas-demo",
+      "server": "https://kubernetes.default.svc"
+    },
+    "syncPolicy": {
+      "syncOptions": [
+        "ServerSideApply=true"
+      ]
+    }
+  }
+}
