@@ -22,7 +22,7 @@ data:
           provider_type: remote::vllm
           config:
             base_url: ${env.OGX_DEMO_MAAS_BASE_URL}
-            auth_credential: ${env.OGX_DEMO_MAAS_TOKEN}
+            api_token: ${env.OGX_DEMO_MAAS_TOKEN}
             max_tokens: 256
             tls_verify: true
 
