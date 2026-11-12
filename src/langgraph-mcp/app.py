@@ -1,6 +1,9 @@
 import asyncio
 import json
 import os
+from urllib.parse import quote
+
+import httpx
 from typing import Annotated, TypedDict
 
 os.environ["LANGSMITH_TRACING"] = "false"
@@ -215,13 +218,190 @@ async def agent(prompt):
                 await client.http_async_client.aclose()
 
 
+
+class RAGState(TypedDict):
+    question: str
+    vector_store_id: str
+    sources: list[dict]
+    context: str
+    context_truncated: bool
+    answer: str
+    finish_reason: str
+    total_tokens: int
+    model_calls: int
+
+
+RAG_SYSTEM_PROMPT = (
+    "Verilen metni kullanarak soruyu cevapla. "
+    "Yalnızca metindeki bilgiyi kullan. "
+    "Türkçe, tek cümleyle cevap ver."
+)
+
+
+async def find_vector_store(client, base_url, name):
+    """Resolve the store by name so a recreated cluster needs no ID edit."""
+    matches = []
+    params = {"limit": 100}
+    seen = set()
+    while True:
+        response = await client.get(base_url + "/vector_stores", params=params)
+        response.raise_for_status()
+        page = response.json()
+        rows = page.get("data", [])
+        matches.extend(row for row in rows if row.get("name") == name)
+        if not page.get("has_more"):
+            break
+        cursor = rows[-1]["id"] if rows else None
+        if not cursor or cursor in seen:
+            raise RuntimeError("Vector store listesi sayfalanamadı.")
+        seen.add(cursor)
+        params["after"] = cursor
+    if len(matches) != 1:
+        raise RuntimeError(f"{name}: tam olarak bir vector store bekleniyor.")
+    return matches[0]["id"]
+
+
+def select_rag_sources(hits, max_chars=2000):
+    """Return exactly the excerpts passed to the model; bound demo context."""
+    sources = []
+    remaining = max_chars
+    truncated = False
+    for hit in hits:
+        text = "\n".join(
+            part["text"]
+            for part in hit.get("content", [])
+            if part.get("type") == "text" and part.get("text")
+        ).strip()
+        if not text:
+            continue
+        separator_size = 2 if sources else 0
+        available = remaining - separator_size
+        if available <= 0:
+            truncated = True
+            break
+        excerpt = text[:available]
+        attrs = hit.get("attributes") or {}
+        sources.append({
+            "filename": hit.get("filename") or attrs.get("filename") or "bilinmeyen",
+            "file_id": attrs.get("file_id") or hit.get("file_id"),
+            "score": hit.get("score"),
+            "text": excerpt,
+            "truncated": len(excerpt) < len(text),
+        })
+        truncated = truncated or len(excerpt) < len(text)
+        remaining -= len(excerpt) + separator_size
+    return sources, truncated
+
+
+@mlflow.trace(name="rag_request", span_type="AGENT")
+async def rag_agent(prompt):
+    base_url = os.environ["OGX_BASE_URL"].rstrip("/")
+    model = os.environ["OGX_MODEL"]
+    store_name = os.environ.get("RAG_VECTOR_STORE_NAME", "demo-docs")
+    top_k = int(os.environ.get("RAG_TOP_K", "3"))
+    if not 1 <= top_k <= 5:
+        raise ValueError("RAG_TOP_K 1–5 arasında olmalı.")
+
+    async def retrieve_node(state):
+        with mlflow.start_span(name="rag.retrieve", span_type="RETRIEVER") as span:
+            span.set_inputs({"query": state["question"], "store_name": store_name})
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(180, connect=15), trust_env=False
+            ) as client:
+                store_id = await find_vector_store(client, base_url, store_name)
+                response = await client.post(
+                    base_url + "/vector_stores/" + quote(store_id, safe="") + "/search",
+                    json={
+                        "query": state["question"],
+                        "search_mode": "vector",
+                        "max_num_results": top_k,
+                    },
+                )
+                response.raise_for_status()
+                hits = response.json().get("data", [])[:top_k]
+            sources, truncated = select_rag_sources(hits)
+            span.set_outputs({"vector_store_id": store_id, "sources": sources})
+            return {
+                "vector_store_id": store_id,
+                "sources": sources,
+                "context": "\n\n".join(source["text"] for source in sources),
+                "context_truncated": truncated,
+            }
+
+    async def generate_node(state):
+        if not state["sources"]:
+            return {
+                "answer": "Dokümanlarda bu bilgi bulunamadı.",
+                "finish_reason": "no_context",
+                "model_calls": 0,
+                "total_tokens": 0,
+            }
+        client = ChatOpenAI(
+            model=model,
+            base_url=base_url,
+            api_key="unused-by-ogx",
+            use_responses_api=False,
+            temperature=0,
+            max_tokens=128,
+            timeout=300,
+            max_retries=0,
+            http_client=DefaultHttpxClient(trust_env=False),
+            http_async_client=DefaultAsyncHttpxClient(trust_env=False),
+        )
+        try:
+            with mlflow.start_span(name="rag.generate", span_type="CHAIN"):
+                response = await client.ainvoke([
+                    SystemMessage(content=RAG_SYSTEM_PROMPT),
+                    HumanMessage(content=(
+                        f"Metin:\n{state['context']}\n\n"
+                        f"Soru: {state['question']}\n/no_think"
+                    )),
+                ])
+            return {
+                "answer": response.content,
+                "finish_reason": response.response_metadata.get("finish_reason", "unknown"),
+                "total_tokens": (response.usage_metadata or {}).get("total_tokens", 0),
+                "model_calls": 1,
+            }
+        finally:
+            client.http_client.close()
+            await client.http_async_client.aclose()
+
+    builder = StateGraph(RAGState)
+    builder.add_node("retrieve", retrieve_node)
+    builder.add_node("generate", generate_node)
+    builder.add_edge(START, "retrieve")
+    builder.add_edge("retrieve", "generate")
+    builder.add_edge("generate", END)
+    result = await builder.compile().ainvoke(
+        {"question": prompt}, config={"recursion_limit": 6}
+    )
+    return {
+        "mode": "rag",
+        "answer": result["answer"],
+        "finish_reason": result["finish_reason"],
+        "total_tokens": result["total_tokens"],
+        "model_calls": result["model_calls"],
+        "sources": result["sources"],
+        "vector_store_id": result["vector_store_id"],
+        "retrieval_query": prompt,
+        "context_truncated": result["context_truncated"],
+        "pod_summary": None,
+        "tool_calls": [],
+    }
+
+
 if __name__ == "__main__":
+    mode = os.environ.get("AGENT_MODE", "pods")
+    if mode not in ("pods", "rag"):
+        raise ValueError("AGENT_MODE pods veya rag olmalı.")
     prompt = os.environ.get(
         "AGENT_PROMPT",
-        "List the pods in maas-demo and briefly explain their status.",
+        "Podları hangi namespace içinde sorgulayabiliyoruz?" if mode == "rag"
+        else "List the pods in maas-demo and briefly explain their status.",
     )
     print(json.dumps(
-        asyncio.run(agent(prompt)),
+        asyncio.run(rag_agent(prompt) if mode == "rag" else agent(prompt)),
         indent=2,
         ensure_ascii=False,
     ))

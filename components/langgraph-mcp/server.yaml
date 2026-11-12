@@ -48,6 +48,10 @@ spec:
               value: http://ogx-agent-demo-service.maas-demo.svc.cluster.local:8321/v1
             - name: OGX_MODEL
               value: maas-vllm-inference-1/publishers/maas-demo/models/qwen3-maas
+            - name: RAG_VECTOR_STORE_NAME
+              value: demo-docs
+            - name: RAG_TOP_K
+              value: "3"
             - name: MCP_URL
               value: http://mcp-pods.maas-demo.svc.cluster.local:8080/mcp
             - name: PYTHONDONTWRITEBYTECODE
