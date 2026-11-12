@@ -9,8 +9,10 @@ data:
   config.yaml: |
     version: "2"
     distro_name: rh
+
     apis:
       - inference
+      - vector_io
 
     providers:
       inference:
@@ -18,15 +20,79 @@ data:
           provider_type: remote::vllm
           config:
             base_url: ${env.OGX_DEMO_MAAS_BASE_URL}
-            api_token: ${env.OGX_DEMO_MAAS_TOKEN}
+            auth_credential: ${env.OGX_DEMO_MAAS_TOKEN}
             max_tokens: 256
             tls_verify: true
+
+        - provider_id: embedding-vllm
+          provider_type: remote::vllm
+          config:
+            base_url: http://rag-embedding:8080/v1
+            refresh_models: false
+            allowed_models:
+              - multilingual-minilm
+
+      vector_io:
+        - provider_id: pgvector
+          provider_type: remote::pgvector
+          config:
+            host: rag-pgvector
+            port: 5432
+            db: rag
+            user: rag
+            password: ${env.OGX_RAG_DB_PASSWORD}
+            distance_metric: COSINE
+            pool_min_size: 1
+            pool_max_size: 5
+            persistence:
+              backend: kv_default
+              namespace: vector_io::pgvector
+            metadata_store:
+              backend: sql_default
+              table_name: vector_store_metadata
+
+    storage:
+      backends:
+        kv_default:
+          type: kv_postgres
+          host: rag-pgvector
+          port: 5432
+          db: rag
+          user: rag
+          password: ${env.OGX_RAG_DB_PASSWORD}
+        sql_default:
+          type: sql_postgres
+          host: rag-pgvector
+          port: 5432
+          db: rag
+          user: rag
+          password: ${env.OGX_RAG_DB_PASSWORD}
+      stores:
+        metadata:
+          backend: kv_default
+          namespace: ogx_registry
+        inference:
+          backend: sql_default
+          table_name: inference_store
 
     registered_resources:
       models:
         - model_id: publishers/maas-demo/models/qwen3-maas
           provider_id: maas-vllm-inference-1
           model_type: llm
+
+        - model_id: multilingual-minilm
+          provider_id: embedding-vllm
+          model_type: embedding
+          metadata:
+            embedding_dimension: 384
+            context_length: 128
+
+    vector_stores:
+      default_provider_id: pgvector
+      default_embedding_model:
+        provider_id: embedding-vllm
+        model_id: multilingual-minilm
 
     server:
       port: 8321
@@ -74,3 +140,8 @@ spec:
             secretKeyRef:
               name: ogx-maas-token
               key: token
+        - name: OGX_RAG_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: rag-pgvector-auth
+              key: password
