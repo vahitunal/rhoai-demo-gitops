@@ -13,6 +13,8 @@ data:
     apis:
       - inference
       - vector_io
+      - files
+      - file_processors
 
     providers:
       inference:
@@ -50,6 +52,22 @@ data:
             metadata_store:
               backend: sql_default
               table_name: vector_store_metadata
+
+      files:
+        - provider_id: localfs
+          provider_type: inline::localfs
+          config:
+            storage_dir: /.ogx/files
+            metadata_store:
+              backend: sql_default
+              table_name: files_metadata
+
+      file_processors:
+        - provider_id: pypdf
+          provider_type: inline::pypdf
+          config:
+            default_chunk_size_tokens: 100
+            default_chunk_overlap_tokens: 10
 
     storage:
       backends:
@@ -93,6 +111,9 @@ data:
       default_embedding_model:
         provider_id: embedding-vllm
         model_id: multilingual-minilm
+      file_ingestion_params:
+        default_chunk_size_tokens: 100
+        default_chunk_overlap_tokens: 10
 
     server:
       port: 8321
@@ -115,6 +136,9 @@ spec:
 
   workload:
     replicas: 1
+    storage:
+      size: 2Gi
+      mountPath: /.ogx
     resources:
       requests:
         cpu: 250m
