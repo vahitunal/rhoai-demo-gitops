@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rag-pgvector-data
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rag-pgvector-init
+data:
+  01-rag.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    psql -v ON_ERROR_STOP=1 \
+      --username "$POSTGRES_USER" \
+      --dbname "$POSTGRES_DB" \
+      --set=rag_password="$RAG_PASSWORD" <<'SQL'
+    CREATE EXTENSION IF NOT EXISTS vector;
+    CREATE ROLE rag LOGIN PASSWORD :'rag_password';
+    GRANT CONNECT ON DATABASE rag TO rag;
+    GRANT USAGE, CREATE ON SCHEMA public TO rag;
+    SQL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-pgvector
+spec:
+  selector:
+    app: rag-pgvector
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-pgvector
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: rag-pgvector
+  template:
+    metadata:
+      labels:
+        app: rag-pgvector
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: docker.io/pgvector/pgvector:0.8.7-pg16-bookworm
+          ports:
+            - name: postgres
+              containerPort: 5432
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_DB
+              value: rag
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rag-pgvector-auth
+                  key: admin-password
+            - name: RAG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rag-pgvector-auth
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          startupProbe:
+            exec:
+              command:
+                - pg_isready
+                - -h
+                - "127.0.0.1"
+                - -U
+                - postgres
+                - -d
+                - rag
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -h
+                - "127.0.0.1"
+                - -U
+                - postgres
+                - -d
+                - rag
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -h
+                - "127.0.0.1"
+                - -U
+                - postgres
+                - -d
+                - rag
+            periodSeconds: 20
+            failureThreshold: 6
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: socket
+              mountPath: /var/run/postgresql
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rag-pgvector-data
+        - name: socket
+          emptyDir: {}
+        - name: init
+          configMap:
+            name: rag-pgvector-init
