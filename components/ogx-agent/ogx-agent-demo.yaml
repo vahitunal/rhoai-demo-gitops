@@ -6,117 +6,38 @@ metadata:
   labels:
     ogx.io/watch: 'true'
 data:
-  config.yaml: |
-    version: "2"
-    distro_name: rh
-
-    apis:
-      - inference
-      - vector_io
-      - files
-      - file_processors
-
-    providers:
-      inference:
-        - provider_id: maas-vllm-inference-1
-          provider_type: remote::vllm
-          config:
-            base_url: ${env.OGX_DEMO_MAAS_BASE_URL}
-            api_token: ${env.OGX_DEMO_MAAS_TOKEN}
-            max_tokens: 256
-            tls_verify: true
-
-        - provider_id: embedding-vllm
-          provider_type: remote::vllm
-          config:
-            base_url: http://rag-embedding:8080/v1
-            refresh_models: false
-            allowed_models:
-              - multilingual-minilm
-
-      vector_io:
-        - provider_id: pgvector
-          provider_type: remote::pgvector
-          config:
-            host: rag-pgvector
-            port: 5432
-            db: rag
-            user: rag
-            password: ${env.OGX_RAG_DB_PASSWORD}
-            distance_metric: COSINE
-            pool_min_size: 1
-            pool_max_size: 5
-            persistence:
-              backend: kv_default
-              namespace: vector_io::pgvector
-            metadata_store:
-              backend: sql_default
-              table_name: vector_store_metadata
-
-      files:
-        - provider_id: localfs
-          provider_type: inline::localfs
-          config:
-            storage_dir: /.ogx/files
-            metadata_store:
-              backend: sql_default
-              table_name: files_metadata
-
-      file_processors:
-        - provider_id: pypdf
-          provider_type: inline::pypdf
-          config:
-            default_chunk_size_tokens: 100
-            default_chunk_overlap_tokens: 10
-
-    storage:
-      backends:
-        kv_default:
-          type: kv_postgres
-          host: rag-pgvector
-          port: 5432
-          db: rag
-          user: rag
-          password: ${env.OGX_RAG_DB_PASSWORD}
-        sql_default:
-          type: sql_postgres
-          host: rag-pgvector
-          port: 5432
-          db: rag
-          user: rag
-          password: ${env.OGX_RAG_DB_PASSWORD}
-      stores:
-        metadata:
-          backend: kv_default
-          namespace: ogx_registry
-        inference:
-          backend: sql_default
-          table_name: inference_store
-
-    registered_resources:
-      models:
-        - model_id: publishers/maas-demo/models/qwen3-maas
-          provider_id: maas-vllm-inference-1
-          model_type: llm
-
-        - model_id: multilingual-minilm
-          provider_id: embedding-vllm
-          model_type: embedding
-          metadata:
-            embedding_dimension: 384
-            context_length: 128
-
-    vector_stores:
-      default_provider_id: pgvector
-      default_embedding_model:
-        provider_id: embedding-vllm
-        model_id: multilingual-minilm
-      file_ingestion_params:
-        default_chunk_size_tokens: 100
-        default_chunk_overlap_tokens: 10
-
-    server:
-      port: 8321
+  config.yaml: "version: \"2\"\ndistro_name: rh\n\napis:\n  - inference\n  - vector_io\n\
+    \  - files\n  - file_processors\n\nproviders:\n  inference:\n    - provider_id:\
+    \ maas-vllm-inference-1\n      provider_type: remote::vllm\n      config:\n  \
+    \      base_url: ${env.OGX_DEMO_MAAS_BASE_URL}\n        api_token: ${env.OGX_DEMO_MAAS_TOKEN}\n\
+    \        max_tokens: 256\n        tls_verify: true\n\n    - provider_id: embedding-vllm\n\
+    \      provider_type: remote::vllm\n      config:\n        base_url: http://rag-embedding:8080/v1\n\
+    \        refresh_models: false\n        allowed_models:\n          - multilingual-minilm\n\
+    \n  vector_io:\n    - provider_id: pgvector\n      provider_type: remote::pgvector\n\
+    \      config:\n        host: rag-pgvector\n        port: 5432\n        db: rag\n\
+    \        user: rag\n        password: ${env.OGX_RAG_DB_PASSWORD}\n        distance_metric:\
+    \ COSINE\n        pool_min_size: 1\n        pool_max_size: 5\n        persistence:\n\
+    \          backend: kv_default\n          namespace: vector_io::pgvector\n   \
+    \     metadata_store:\n          backend: sql_default\n          table_name: vector_store_metadata\n\
+    \n  files:\n    - provider_id: localfs\n      provider_type: inline::localfs\n\
+    \      config:\n        storage_dir: /.ogx/files\n        metadata_store:\n  \
+    \        backend: sql_default\n          table_name: files_metadata\n\n  file_processors:\n\
+    \    - provider_id: pypdf\n      provider_type: inline::pypdf\n      config:\n\
+    \        default_chunk_size_tokens: 100\n        default_chunk_overlap_tokens:\
+    \ 10\n\nstorage:\n  backends:\n    kv_default:\n      type: kv_postgres\n    \
+    \  host: rag-pgvector\n      port: 5432\n      db: rag\n      user: rag\n    \
+    \  password: ${env.OGX_RAG_DB_PASSWORD}\n    sql_default:\n      type: sql_postgres\n\
+    \      host: rag-pgvector\n      port: 5432\n      db: rag\n      user: rag\n\
+    \      password: ${env.OGX_RAG_DB_PASSWORD}\n  stores:\n    metadata:\n      backend:\
+    \ kv_default\n      namespace: ogx_registry\n    inference:\n      backend: sql_default\n\
+    \      table_name: inference_store\n\nregistered_resources:\n  models:\n    -\
+    \ model_id: publishers/maas-demo/models/qwen3-maas\n      provider_id: maas-vllm-inference-1\n\
+    \      model_type: llm\n\n    - model_id: multilingual-minilm\n      provider_id:\
+    \ embedding-vllm\n      model_type: embedding\n      metadata:\n        embedding_dimension:\
+    \ 384\n        context_length: 128\n\nvector_stores:\n  default_provider_id: pgvector\n\
+    \  default_embedding_model:\n    provider_id: embedding-vllm\n    model_id: multilingual-minilm\n\
+    \  file_ingestion_params:\n    default_chunk_size_tokens: 100\n    default_chunk_overlap_tokens:\
+    \ 10\n\nserver:\n  port: 8321\n"
 ---
 apiVersion: ogx.io/v1beta1
 kind: OGXServer
@@ -166,10 +87,3 @@ spec:
           secretKeyRef:
             name: rag-pgvector-auth
             key: password
-      volumes:
-      - name: rag-files-persistent
-        persistentVolumeClaim:
-          claimName: ogx-agent-demo-pvc
-      volumeMounts:
-      - name: rag-files-persistent
-        mountPath: /.ogx/files
