@@ -41,7 +41,7 @@ def reset():
     with open("/etc/ogx/config.yaml") as file:
         config = yaml.safe_load(file)
     paths = [p.get("config", {}).get("storage_dir") for p in config.get("providers", {}).get("files", []) if p.get("provider_type") == "inline::localfs"]
-    if paths != ["/.ogx/files"] or not os.path.ismount("/.ogx/files"):
+    if paths != ["/.ogx/files"] or not (os.path.ismount("/.ogx") or os.path.ismount("/.ogx/files")):
         raise RuntimeError("/.ogx/files ayrı bir volume olarak bağlı değil; hiçbir veri silinmedi.")
 
     stores = [row for row in list_all("/vector_stores") if row.get("name") == "demo-docs"]
