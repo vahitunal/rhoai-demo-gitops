@@ -1,0 +1,1 @@
+RAG vektörleri rag-pgvector PostgreSQL servisindeki rag veritabanında saklanır. rag-embedding servisi CPU üzerinde 384 boyutlu embedding üretir.

@@ -1,0 +1,1 @@
+Pod sorgulama aracı yalnızca maas-demo namespace'ini okuyabilir. Sorgular mcp-pods servisi üzerinden Kubernetes API'ye gönderilir.

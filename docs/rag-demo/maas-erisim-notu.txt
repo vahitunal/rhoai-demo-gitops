@@ -1,0 +1,1 @@
+Model erişim yolu LangGraph → OGX → MaaS → Qwen3 şeklindedir. MaaS, model isteklerinde token doğrulaması ve kullanım kotası uygular.

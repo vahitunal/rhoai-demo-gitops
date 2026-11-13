@@ -4,7 +4,7 @@ metadata:
   name: ogx-agent-demo-config
   namespace: maas-demo
   labels:
-    ogx.io/watch: "true"
+    ogx.io/watch: 'true'
 data:
   config.yaml: |
     version: "2"
@@ -126,14 +126,11 @@ metadata:
 spec:
   distribution:
     name: rh
-
   network:
     port: 8321
-
   overrideConfig:
     name: ogx-agent-demo-config
     key: config.yaml
-
   workload:
     replicas: 1
     storage:
@@ -144,28 +141,35 @@ spec:
         cpu: 250m
         memory: 500Mi
       limits:
-        cpu: "2"
+        cpu: '2'
         memory: 2Gi
     overrides:
       command:
-        - /bin/sh
-        - -c
-        - ogx run /etc/ogx/config.yaml --insecure
+      - /bin/sh
+      - -c
+      - ogx run /etc/ogx/config.yaml --insecure
       env:
-        - name: OGX_DEMO_MAAS_BASE_URL
-          valueFrom:
-            configMapKeyRef:
-              name: maas-cluster-settings
-              key: base-url
-        - name: OGX_CONFIG_DIR
-          value: /.ogx
-        - name: OGX_DEMO_MAAS_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: ogx-maas-token
-              key: token
-        - name: OGX_RAG_DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: rag-pgvector-auth
-              key: password
+      - name: OGX_DEMO_MAAS_BASE_URL
+        valueFrom:
+          configMapKeyRef:
+            name: maas-cluster-settings
+            key: base-url
+      - name: OGX_CONFIG_DIR
+        value: /.ogx
+      - name: OGX_DEMO_MAAS_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: ogx-maas-token
+            key: token
+      - name: OGX_RAG_DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: rag-pgvector-auth
+            key: password
+      volumes:
+      - name: rag-files-persistent
+        persistentVolumeClaim:
+          claimName: ogx-agent-demo-pvc
+      volumeMounts:
+      - name: rag-files-persistent
+        mountPath: /.ogx/files
