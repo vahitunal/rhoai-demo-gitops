@@ -4,7 +4,7 @@ import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import BoundedSemaphore
 
-from app import agent, rag_agent
+from app import agent, rag_agent, combined_agent
 
 BUSY = BoundedSemaphore(1)
 
@@ -40,6 +40,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7fa;padding:14px}
 <select id="mode">
 <option value="pods">Pod sorgula · MCP</option>
 <option value="rag">Dokümana sor · RAG</option>
+<option value="combined">Birlikte sor · MCP + RAG</option>
 </select>
 <p id="description">maas-demo podlarının güncel durumunu MCP üzerinden sorgular.</p>
 <label for="prompt">Sorun</label>
@@ -56,6 +57,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f7fa;padding:14px}
 <div id="sources"></div>
 <p id="context-note" class="muted" hidden>Bağlam sınırı nedeniyle bulunan metinlerin bir bölümü kullanıldı.</p>
 </div>
+<p id="pod-context-note" class="muted" hidden>Model yalnızca sayısal pod özetini gördü; tam pod verisi araç sonuçlarında bulunur.</p>
 <details id="trace-section"><summary>MCP araç çağrıları ve sonuçları</summary><pre id="trace"></pre></details>
 </section>
 <script>
@@ -64,10 +66,12 @@ const button=document.getElementById('send');
 const status=document.getElementById('status');
 const mode=document.getElementById('mode');
 const prompt=document.getElementById('prompt');
-const defaults={pods:'maas-demo podlarının durumunu Türkçe ve kısaca özetle.',rag:'Podları hangi namespace içinde sorgulayabiliyoruz?'};
+const defaults={pods:'maas-demo podlarının durumunu Türkçe ve kısaca özetle.',rag:'Podları hangi namespace içinde sorgulayabiliyoruz?',combined:'Dokümana göre pod sorguları hangi servis üzerinden yapılıyor ve maas-demo podlarının şu anki durumu nasıl?'};
 mode.addEventListener('change',()=>{
   if(!prompt.value.trim()||Object.values(defaults).includes(prompt.value))prompt.value=defaults[mode.value];
-  document.getElementById('description').textContent=mode.value==='rag'
+  document.getElementById('description').textContent=mode.value==='combined'
+    ? 'Doküman bilgisini ve maas-demo canlı pod durumunu tek yanıtta birleştirir.'
+    : mode.value==='rag'
     ? 'demo-docs içindeki dokümanları arar; bulunan metinleri kullanarak cevap üretir.'
     : 'maas-demo podlarının güncel durumunu MCP üzerinden sorgular.';
   document.getElementById('result').hidden=true;
@@ -87,10 +91,11 @@ form.addEventListener('submit',async event=>{
     const data=await response.json();
     if(!response.ok)throw Error(data.error||'İstek başarısız.');
     const rag=data.mode==='rag';
+    const combined=data.mode==='combined';
     document.getElementById('pod-section').hidden=rag;
     document.getElementById('trace-section').hidden=rag;
-    document.getElementById('sources-section').hidden=!rag;
-    document.getElementById('answer-title').textContent=rag?'Dokümana dayalı yanıt':'Model yorumu';
+    document.getElementById('sources-section').hidden=!(rag||combined);
+    document.getElementById('answer-title').textContent=combined?'Doküman ve canlı pod yorumu':rag?'Dokümana dayalı yanıt':'Model yorumu';
     document.getElementById('answer').textContent=data.answer||'Model görünür bir yanıt üretmedi.';
     const fields=[
       ['total_pods','Toplam pod'],['running_pods','Çalışan pod'],
@@ -116,8 +121,9 @@ form.addEventListener('submit',async event=>{
       }
       sources.append(box);
     }
-    if(rag&&!sources.children.length)sources.textContent='Arama sonucu boş döndü.';
+    if((rag||combined)&&!sources.children.length)sources.textContent='Arama sonucu boş döndü.';
     document.getElementById('context-note').hidden=!data.context_truncated;
+    document.getElementById('pod-context-note').hidden=!data.pod_context_truncated;
     document.getElementById('usage').textContent=
       'Model çağrısı: '+data.model_calls+' · Toplam token: '+data.total_tokens+' · Bitiş: '+data.finish_reason;
     document.getElementById('result').hidden=false;
@@ -170,10 +176,10 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("Soru 1–2000 karakter olmalı.")
 
             mode = payload.get("mode", "pods")
-            if mode not in ("pods", "rag"):
-                raise ValueError("Sorgu türü pods veya rag olmalı.")
+            if mode not in ("pods", "rag", "combined"):
+                raise ValueError("Sorgu türü pods, rag veya combined olmalı.")
             result = asyncio.run(
-                rag_agent(prompt.strip()) if mode == "rag" else agent(prompt.strip())
+                {"pods": agent, "rag": rag_agent, "combined": combined_agent}[mode](prompt.strip())
             )
             result["mode"] = mode
             answer = result["answer"]
