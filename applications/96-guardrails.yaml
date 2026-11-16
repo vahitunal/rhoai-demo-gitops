@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: rhoai-demo-guardrails
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "96"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/vahitunal/rhoai-demo-gitops.git
+    targetRevision: main
+    path: components/guardrails
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: maas-demo
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true

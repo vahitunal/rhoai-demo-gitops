@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-pii-config
+  namespace: maas-demo
+data:
+  config.yaml: |
+    rails:
+      config:
+        sensitive_data_detection:
+          input:
+            entities:
+              - EMAIL_ADDRESS
+              - PHONE_NUMBER
+              - CREDIT_CARD
+          output:
+            entities:
+              - EMAIL_ADDRESS
+              - PHONE_NUMBER
+              - CREDIT_CARD
+      input:
+        flows:
+          - detect sensitive data on input
+      output:
+        flows:
+          - detect sensitive data on output
+  rails.co: |
+    # Built-in sensitive data detection flows.
+---
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: NemoGuardrails
+metadata:
+  name: agent-guardrails
+  namespace: maas-demo
+  annotations:
+    security.opendatahub.io/enable-auth: "true"
+spec:
+  replicas: 1
+  nemoConfigs:
+    - name: agent-pii
+      configMaps:
+        - agent-pii-config
