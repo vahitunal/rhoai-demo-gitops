@@ -108,7 +108,7 @@ async def check_input_policy(text):
                 response = await client.post(
                     base + "/v1/guardrail/checks",
                     headers={"Authorization": "Bearer " + token},
-                    json={"model": "policy-check", "messages": [
+                    json={"model": os.environ["OGX_MODEL"], "messages": [
                         {"role": "user", "content": text}
                     ]},
                 )
