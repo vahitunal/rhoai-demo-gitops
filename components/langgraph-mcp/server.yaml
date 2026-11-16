@@ -36,6 +36,8 @@ spec:
           env:
             - name: GUARDRAILS_URL
               value: https://agent-guardrails.maas-demo.svc
+            - name: POLICY_GUARDRAILS_URL
+              value: https://agent-policy-guardrails.maas-demo.svc
             - name: GUARDRAILS_CA_PATH
               value: /var/run/mlflow-ca/service-ca.crt
             - name: MLFLOW_TRACKING_URI
