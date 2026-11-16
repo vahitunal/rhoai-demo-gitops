@@ -10,7 +10,7 @@ to bypass namespace authorization. Educational security questions remain allowed
 
 1. User question -> existing `agent-guardrails` PII and TCKN rails.
 2. If PII passes, question -> `agent-policy-guardrails` -> OGX -> MaaS -> Qwen3.
-3. NeMo parses Yes as block and No as allow. Any other decision fails closed.
+3. NeMo parses BLOCK as denial and ALLOW as permission. Any other decision fails closed.
 4. Only an allowed question starts the existing MCP/RAG/agent flow.
 5. Existing PII checks on MCP results, RAG sources, and final output still run.
 
@@ -31,7 +31,7 @@ against all indirect prompt injection or answer hallucinations.
   remain in OGX's existing Secret. No new secret or separately served model is needed.
 
 The policy prompt is held in `prompts.yml` inside the ConfigMap. `config.py`
-registers a strict output parser: only Yes/No (optionally a final period and a
+registers a strict output parser: only ALLOW/BLOCK (optionally a final period and a
 complete leading Qwen reasoning block) is accepted. A truncated or malformed
 decision raises an error instead of implicitly allowing the request.
 
@@ -88,3 +88,15 @@ Revert this integration commit, push, sync the LangGraph Application, and rebuil
 it. The previous PII-only application behavior is restored. Then sync the
 Guardrails Application; prune only the removed policy CR/ConfigMap if desired.
 The original `agent-guardrails` PII service is retained throughout.
+
+
+## Prompt sensitivity regression
+
+The initial single-message Yes/No prompt rejected a legitimate Turkish pod
+summary request without the word "kısaca", while allowing the longer variant.
+The updated task uses separate system/user messages and ALLOW/BLOCK labels.
+Examples are semantic guidance to the LLM, not an application-side allowlist.
+The exact failing web question is retained in the regression test alongside
+other benign and prohibited requests. Local parser/configuration tests do not
+establish the real model's classification accuracy; rerun cluster and UI tests.
+Only the policy ConfigMap and the test script change, so no agent build is needed.
