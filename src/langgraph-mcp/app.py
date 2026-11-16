@@ -39,15 +39,14 @@ SYSTEM_PROMPT = (
 
 import mlflow
 import mlflow.langchain
+from guardrails import check_text, guarded_agent
 
 mlflow.set_experiment(os.environ["MLFLOW_EXPERIMENT_NAME"])
-mlflow.langchain.autolog(
-    log_traces=True,
-    run_tracer_inline=True,
-)
+# Keep manual spans; automatic traces would capture unchecked model output.
+mlflow.langchain.autolog(disable=True)
 
 
-@mlflow.trace(name="agent_request", span_type="AGENT")
+@guarded_agent("agent_request")
 async def agent(prompt):
     mcp_url = os.environ["MCP_URL"]
     base_url = os.environ["OGX_BASE_URL"].rstrip("/")
@@ -134,7 +133,7 @@ async def agent(prompt):
                         result = await session.call_tool(
                             call["name"], arguments=call["args"]
                         )
-                        span.set_outputs(result.model_dump(mode="json"))
+                        span.set_outputs({"is_error": bool(result.isError)})
                         if result.isError:
                             span.set_status("ERROR")
                     content = "\n".join(
@@ -145,6 +144,7 @@ async def agent(prompt):
                     if not content:
                         raise RuntimeError("MCP metin sonucu döndürmedi.")
 
+                    await check_text(content, "mcp_result")
                     parsed = (
                         {"error": content}
                         if result.isError
@@ -300,7 +300,7 @@ async def retrieve_documents(state):
     if not 1 <= top_k <= 5:
         raise ValueError("RAG_TOP_K 1–5 arasında olmalı.")
     with mlflow.start_span(name="rag.retrieve", span_type="RETRIEVER") as span:
-        span.set_inputs({"query": state["question"], "store_name": store_name})
+        span.set_inputs({"query_characters": len(state["question"]), "store_name": store_name})
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(180, connect=15), trust_env=False
         ) as client:
@@ -316,7 +316,9 @@ async def retrieve_documents(state):
             response.raise_for_status()
             hits = response.json().get("data", [])[:top_k]
         sources, truncated = select_rag_sources(hits)
-        span.set_outputs({"vector_store_id": store_id, "sources": sources})
+        if sources:
+            await check_text(json.dumps(sources, ensure_ascii=False), "rag_context")
+        span.set_outputs({"source_count": len(sources), "context_truncated": truncated})
         return {
             "vector_store_id": store_id,
             "sources": sources,
@@ -325,7 +327,7 @@ async def retrieve_documents(state):
         }
 
 
-@mlflow.trace(name="rag_request", span_type="AGENT")
+@guarded_agent("rag_request")
 async def rag_agent(prompt):
     base_url = os.environ["OGX_BASE_URL"].rstrip("/")
     model = os.environ["OGX_MODEL"]
@@ -426,10 +428,11 @@ async def collect_live_pods(state):
             span.set_status("ERROR")
             raise RuntimeError("MCP pod sorgusu başarısız; birleşik yanıt üretilmedi.")
         content = "\n".join(b.text for b in result.content if b.type == "text")
+        await check_text(content, "mcp_result")
         parsed = json.loads(content)
         if not isinstance(parsed, dict) or not isinstance(parsed.get("summary"), dict):
             raise RuntimeError("MCP sonucunda sayısal özet bulunamadı.")
-        span.set_outputs(parsed)
+        span.set_outputs({"is_error": False})
     # Keep the exact summary; bound pod details to protect the CPU model context.
     pod_context = json.dumps(parsed, ensure_ascii=False)
     truncated = len(pod_context) > 3500
@@ -445,7 +448,7 @@ async def collect_live_pods(state):
     }
 
 
-@mlflow.trace(name="combined_request", span_type="AGENT")
+@guarded_agent("combined_request")
 async def combined_agent(prompt):
     async def generate_combined(state):
         client = ChatOpenAI(

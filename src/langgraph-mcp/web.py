@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import BoundedSemaphore
 
 from app import agent, rag_agent, combined_agent
+from guardrails import GuardrailBlocked, GuardrailUnavailable
 
 BUSY = BoundedSemaphore(1)
 
@@ -187,6 +188,12 @@ class Handler(BaseHTTPRequestHandler):
                 answer = re.sub(r"<think>.*?</think>", "", answer, flags=re.S)
                 result["answer"] = answer.split("<think>", 1)[0].strip()
             self.send(200, result)
+        except GuardrailBlocked as error:
+            self.send(422, {"error": str(error), "guardrails": {
+                "status": "blocked", "stage": error.stage,
+            }})
+        except GuardrailUnavailable as error:
+            self.send(503, {"error": str(error), "guardrails": {"status": "error"}})
         except ValueError as error:
             self.send(400, {"error": str(error)})
         except Exception as error:
