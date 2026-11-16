@@ -4,8 +4,9 @@ NeMo Guardrails must be Ready as `agent-guardrails` in `maas-demo`.
 The agent calls `https://agent-guardrails.maas-demo.svc/v1/guardrail/checks`.
 TLS verification uses the existing service CA mount. The existing projected
 ServiceAccount token is read for each check so token rotation is supported.
-A namespace Role grants only `get` on the `agent-guardrails` Service, matching
-the resource authorization performed by kube-rbac-proxy.
+A namespace Role grants `get` on Service objects in `maas-demo`. The deployed
+proxy performs a resource-level check without an effective resource name, so
+a resourceNames restriction does not match this installation.
 
 All three entry points (pods, rag, combined) check the prompt before invoking
 MCP, retrieval, or the LLM. Retrieved sources and MCP text are checked before
@@ -40,7 +41,7 @@ BuildConfig has only a ConfigChange trigger: code changes require a build.
 ```bash
 oc start-build langgraph-mcp -n maas-demo --follow
 oc rollout status deployment/langgraph-mcp -n maas-demo --timeout=300s
-oc auth can-i get services/agent-guardrails -n maas-demo \
+oc auth can-i get services -n maas-demo \
   --as=system:serviceaccount:maas-demo:langgraph-mcp
 ```
 
@@ -87,7 +88,20 @@ PY
 
 This is a minimal demo policy, not complete Turkish PII coverage. Validate
 telephone and credit-card recognition with synthetic examples separately.
-Turkish person names and T.C. identity-number checks are not configured.
+Turkish person-name recognition is not configured. T.C. identity-number
+candidates are blocked by input and output regex rails: 11 consecutive digits,
+first digit nonzero, without adjacent digits. This deliberately blocks even
+checksum-invalid candidates such as 12345678901. It does not verify checksum,
+identity, or ownership, and can block other 11-digit identifiers. Spaced or
+hyphenated candidate numbers are not covered by this regex. The Python client
+requires both Presidio and regex rails to pass; either may block the request.
+A missing rail or invalid result fails closed with HTTP 503.
+
+After a policy update, sync `rhoai-demo-guardrails` and wait for the operator
+to roll out the updated `agent-guardrails` deployment. After a Python code
+update, build `langgraph-mcp` and wait for its image rollout. While policy
+and client versions differ, requests can return HTTP 503; complete both
+rollouts before testing.
 PII detection may produce false positives and false negatives. Regex/Presidio
 PII rails do not provide prompt-injection or hallucination protection.
 

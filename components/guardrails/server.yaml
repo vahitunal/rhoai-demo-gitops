@@ -18,12 +18,22 @@ data:
               - EMAIL_ADDRESS
               - PHONE_NUMBER
               - CREDIT_CARD
+        regex_detection:
+          input:
+            patterns:
+              # TCKN candidate: 11 digits, first digit nonzero. No checksum validation.
+              - '(?<![0-9])[1-9][0-9]{10}(?![0-9])'
+          output:
+            patterns:
+              - '(?<![0-9])[1-9][0-9]{10}(?![0-9])'
       input:
         flows:
           - detect sensitive data on input
+          - regex check input
       output:
         flows:
           - detect sensitive data on output
+          - regex check output
   rails.co: |
     # Built-in sensitive data detection flows.
 ---

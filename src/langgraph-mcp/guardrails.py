@@ -53,13 +53,22 @@ async def check_text(text, stage, role="user"):
                 response.raise_for_status()
                 data = response.json()
             direction = "output" if role == "assistant" else "input"
-            rail = "detect sensitive data on " + direction
-            rail_status = data.get("rails_status", {}).get(rail, {}).get("status")
+            expected_rails = (
+                "detect sensitive data on " + direction,
+                "regex check " + direction,
+            )
+            rails = data.get("rails_status", {})
+            statuses = {
+                name: rails.get(name, {}).get("status") for name in expected_rails
+            }
+            blocked_rails = [name for name, value in statuses.items() if value == "blocked"]
             status = data.get("status")
-            if status == "blocked" and rail_status == "blocked":
-                span.set_outputs({"status": "blocked"})
+            # A blocking rail may short-circuit subsequent rails.
+            if status == "blocked" and blocked_rails:
+                span.set_outputs({"status": "blocked", "blocked_rails": blocked_rails})
                 raise GuardrailBlocked(stage)
-            if status != "success" or rail_status != "success":
+            # Success requires both configured rails to explicitly pass.
+            if status != "success" or any(value != "success" for value in statuses.values()):
                 raise GuardrailUnavailable()
             span.set_outputs({"status": "success"})
         except GuardrailBlocked:
